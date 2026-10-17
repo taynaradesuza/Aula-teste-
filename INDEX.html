@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel de Faturamento Hospitalar – Auditoria de Contas</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--navy:#192b4d;--wine:#7f1d3f;--red:#c43d4b;--pink:#e7a3ad;--blue:#3e6c9e;--teal:#3b8c87;--gold:#d8a13a;--bg:#f4f6fa;--ink:#202b3c;--muted:#697586;--line:#e5e9f0}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Segoe UI,Arial,sans-serif}
+.wrap{max-width:1500px;margin:auto;padding:28px}
+header{background:linear-gradient(120deg,#192b4d,#70203e);color:#fff;border-radius:18px;padding:28px 30px;margin-bottom:20px;box-shadow:0 8px 24px #192b4d20}
+.eyebrow{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;opacity:.8;font-weight:700}
+h1{font-size:clamp(24px,3vw,34px);line-height:1.15;margin:9px 0 8px}
+header p{margin:0;color:#f4dfe5;font-size:14px}
+.cards{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px;margin-bottom:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;min-width:0;box-shadow:0 3px 12px #172b4d08}
+.card-top{display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--muted);font-size:12px;font-weight:650}
+.ico{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#f7e9ed;color:var(--wine);font-size:18px}
+.value{font-size:clamp(19px,1.8vw,27px);font-weight:750;letter-spacing:-.6px;margin-top:15px;white-space:nowrap}
+.note{font-size:11px;color:var(--muted);margin-top:5px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:15px;padding:20px;min-width:0;box-shadow:0 3px 12px #172b4d08}
+.panel.wide{grid-column:1/-1}
+.panel h2{font-size:16px;margin:0 0 5px;color:var(--navy)}
+.sub{font-size:12px;color:var(--muted);margin-bottom:15px}
+.chartbox{position:relative;height:310px}
+.chartbox.tall{height:370px}
+.findings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}
+.finding{display:flex;gap:12px;background:#fafbfe;border:1px solid var(--line);padding:14px;border-radius:12px;font-size:13px;line-height:1.5}
+.num{flex:0 0 28px;height:28px;border-radius:9px;background:#f5e4e9;color:var(--wine);font-weight:800;display:grid;place-items:center}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:24px 10px 8px}
+@media(max-width:1100px){.cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:720px){.wrap{padding:14px}.cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.card{padding:14px}.value{font-size:20px}.grid{grid-template-columns:1fr}.panel.wide{grid-column:auto}.panel{padding:15px}.chartbox{height:290px}.chartbox.tall{height:350px}.findings{grid-template-columns:1fr}header{padding:22px 20px}}
+</style>
+</head>
+<body><main class="wrap">
+<header><div class="eyebrow">Gestão de receita · Auditoria</div><h1>Painel de Faturamento Hospitalar – Auditoria de Contas</h1><p>Período dos faturamentos: <strong>16/06/2023 a 19/09/2023</strong> · Visão agregada da base analisada</p></header>
+<section class="cards" id="cards"></section>
+<section class="grid">
+<article class="panel wide"><h2>Faturado x Recebido x Glosado por convênio</h2><div class="sub">Valores em reais · passe o mouse nas barras para consultar os valores</div><div class="chartbox tall"><canvas id="cConvenio"></canvas></div></article>
+<article class="panel wide"><h2>Taxa de glosa por convênio</h2><div class="sub">Ordenada da maior para a menor · glosa total ÷ faturamento total do convênio</div><div class="chartbox tall"><canvas id="cTaxa"></canvas></div></article>
+<article class="panel"><h2>Glosa por procedimento</h2><div class="sub">Os três procedimentos com maior glosa estão destacados</div><div class="chartbox"><canvas id="cProcedimento"></canvas></div></article>
+<article class="panel"><h2>Faturamento e glosa por hospital</h2><div class="sub">Valores agregados por hospital, com nomes padronizados</div><div class="chartbox"><canvas id="cHospital"></canvas></div></article>
+<article class="panel"><h2>Eletivo x Emergência</h2><div class="sub">Distribuição do faturamento por tipo de atendimento</div><div class="chartbox"><canvas id="cTipo"></canvas></div></article>
+<article class="panel"><h2>Prazo médio de recebimento por convênio</h2><div class="sub">Média da coluna MEDIA DE RECEB, em dias</div><div class="chartbox"><canvas id="cPrazo"></canvas></div></article>
+<article class="panel wide"><h2>Principais achados da auditoria</h2><div class="sub">Conclusões descritivas sustentadas pelos valores presentes na planilha</div><div class="findings" id="findings"></div></article>
+</section>
+<footer>Fonte: planilha PAINEL FAT 3 – aba DADOS</footer>
+</main>
+<script>
+const D = {"summary": {"n": 37, "fat": 308387.87, "rec": 269756.91000000003, "glosa": 38630.96, "taxa": 0.1252674432363374, "prazo": 30.89189189189189, "min": "16/06/2023", "max": "19/09/2023"}, "convenios": [{"label": "IPASGO", "fat": 145513.31, "rec": 142951.58, "glosa": 2561.73, "taxa": 1.7605, "prazo": 30.81}, {"label": "UNIMED", "fat": 116107.53, "rec": 80148.98, "glosa": 35958.55, "taxa": 30.97, "prazo": 30.92}, {"label": "PARTICULAR", "fat": 23051.84, "rec": 23051.84, "glosa": 0.0, "taxa": 0.0, "prazo": 31.0}, {"label": "ASSEFAZ", "fat": 16013.09, "rec": 15902.41, "glosa": 110.68, "taxa": 0.6912, "prazo": 31.0}, {"label": "GEAP", "fat": 4517.26, "rec": 4517.26, "glosa": 0.0, "taxa": 0.0, "prazo": 31.0}, {"label": "IMAS", "fat": 3184.84, "rec": 3184.84, "glosa": 0.0, "taxa": 0.0, "prazo": 31.0}], "taxa": [{"label": "UNIMED", "fat": 116107.53, "rec": 80148.98, "glosa": 35958.55, "taxa": 30.97, "prazo": 30.92}, {"label": "IPASGO", "fat": 145513.31, "rec": 142951.58, "glosa": 2561.73, "taxa": 1.7605, "prazo": 30.81}, {"label": "ASSEFAZ", "fat": 16013.09, "rec": 15902.41, "glosa": 110.68, "taxa": 0.6912, "prazo": 31.0}, {"label": "PARTICULAR", "fat": 23051.84, "rec": 23051.84, "glosa": 0.0, "taxa": 0.0, "prazo": 31.0}, {"label": "GEAP", "fat": 4517.26, "rec": 4517.26, "glosa": 0.0, "taxa": 0.0, "prazo": 31.0}, {"label": "IMAS", "fat": 3184.84, "rec": 3184.84, "glosa": 0.0, "taxa": 0.0, "prazo": 31.0}], "procedimentos": [{"label": "ATC", "value": 29579.07}, {"label": "CATETERISMO", "value": 8239.15}, {"label": "ATP CEREBRAL", "value": 812.74}, {"label": "ATP VASCULAR", "value": 0.0}, {"label": "TAVI", "value": 0.0}], "hospitais": [{"label": "HOSP CENTRO", "fat": 107155.09, "glosa": 4666.44}, {"label": "HOSP SUL", "fat": 86682.17, "glosa": 1560.86}, {"label": "HOSP SUDESTE", "fat": 55395.18, "glosa": 32379.17}, {"label": "HOSP LESTE", "fat": 46478.18, "glosa": 24.49}, {"label": "HOSP NORTE", "fat": 12677.25, "glosa": 0.0}], "tipos": [{"label": "ELETIVO", "value": 185899.52}, {"label": "EMERGÊNCIA", "value": 122488.35}]};
+const fmtBRL = v => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v);
+const fmtNum = (v,d=2) => new Intl.NumberFormat('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
+const fmtPct = v => fmtNum(v,2)+'%';
+const commonTooltip={callbacks:{label:ctx=>`${ctx.dataset.label||ctx.label}: ${fmtBRL(ctx.parsed.y ?? ctx.parsed)}`}};
+Chart.defaults.font.family='Inter, Segoe UI, Arial, sans-serif';
+Chart.defaults.color='#657286';
+Chart.defaults.plugins.legend.labels.usePointStyle=true;
+const s=D.summary;
+const cards=[
+['◈','Total Faturado',fmtBRL(s.fat),'Soma de VALOR FAT'],
+['↗','Total Recebido',fmtBRL(s.rec),'Soma de VALOR REC'],
+['▤','Total Glosado',fmtBRL(s.glosa),'Soma de VALOR GLOSA'],
+['%','Taxa de Glosa',fmtPct(s.taxa*100),'Glosa ÷ faturamento'],
+['◷','Prazo Médio',fmtNum(s.prazo)+' dias','Média de MEDIA DE RECEB'],
+['▦','Nº de Contas',String(s.n),'Linhas com dados']
+];
+document.getElementById('cards').innerHTML=cards.map(x=>`<article class="card"><div class="card-top"><span>${x[1]}</span><span class="ico">${x[0]}</span></div><div class="value">${x[2]}</div><div class="note">${x[3]}</div></article>`).join('');
+const labels=D.convenios.map(x=>x.label);
+new Chart(document.getElementById('cConvenio'),{type:'bar',data:{labels,datasets:[
+{label:'Faturado',data:D.convenios.map(x=>x.fat),backgroundColor:'#263f67',borderRadius:4},
+{label:'Recebido',data:D.convenios.map(x=>x.rec),backgroundColor:'#4a9b91',borderRadius:4},
+{label:'Glosado',data:D.convenios.map(x=>x.glosa),backgroundColor:'#c84b5b',borderRadius:4}]},
+options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{tooltip:commonTooltip},scales:{y:{beginAtZero:true,ticks:{callback:v=>fmtBRL(v)}}}}});
+new Chart(document.getElementById('cTaxa'),{type:'bar',data:{labels:D.taxa.map(x=>x.label),datasets:[{label:'Taxa de glosa',data:D.taxa.map(x=>x.taxa),backgroundColor:D.taxa.map((x,i)=>i===0?'#8c2346':'#c97a8d'),borderRadius:5}]},
+options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${fmtPct(c.parsed.x)} · Glosa: ${fmtBRL(D.taxa[c.dataIndex].glosa)} / Faturado: ${fmtBRL(D.taxa[c.dataIndex].fat)}`}}},scales:{x:{beginAtZero:true,ticks:{callback:v=>fmtNum(v)+'%'}}}}});
+const procColors=D.procedimentos.map((x,i)=>i<3?['#7f1d3f','#c43d4b','#d8a13a'][i]:'#cbd3df');
+new Chart(document.getElementById('cProcedimento'),{type:'doughnut',data:{labels:D.procedimentos.map(x=>x.label),datasets:[{label:'Glosa',data:D.procedimentos.map(x=>x.value),backgroundColor:procColors,borderColor:'#fff',borderWidth:3,hoverOffset:8}]},
+options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>`${c.label}: ${fmtBRL(c.parsed)}`}}},cutout:'58%'}});
+new Chart(document.getElementById('cHospital'),{type:'bar',data:{labels:D.hospitais.map(x=>x.label),datasets:[
+{label:'Faturado',data:D.hospitais.map(x=>x.fat),backgroundColor:'#263f67',borderRadius:4},
+{label:'Glosado',data:D.hospitais.map(x=>x.glosa),backgroundColor:'#c84b5b',borderRadius:4}]},
+options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{tooltip:commonTooltip},scales:{y:{beginAtZero:true,ticks:{callback:v=>fmtBRL(v)}}}}});
+new Chart(document.getElementById('cTipo'),{type:'pie',data:{labels:D.tipos.map(x=>x.label),datasets:[{label:'Faturamento',data:D.tipos.map(x=>x.value),backgroundColor:['#7f1d3f','#3e6c9e'],borderColor:'#fff',borderWidth:3,hoverOffset:8}]},
+options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>`${c.label}: ${fmtBRL(c.parsed)} (${fmtNum(c.parsed/D.tipos.reduce((a,b)=>a+b.value,0)*100,1)}%)`}}}}});
+new Chart(document.getElementById('cPrazo'),{type:'bar',data:{labels:D.convenios.map(x=>x.label),datasets:[{label:'Prazo médio (dias)',data:D.convenios.map(x=>x.prazo),backgroundColor:'#3e6c9e',borderRadius:5}]},
+options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${fmtNum(c.parsed.y)} dias`}},},scales:{y:{beginAtZero:true,title:{display:true,text:'Dias'}}}}});
+const findings=["Taxa de glosa global de 12,53%: R$ 38.630,96 glosados sobre R$ 308.387,87 faturados.", "O convênio UNIMED concentra R$ 35.958,55 em glosas, com taxa de 30,97%.", "O procedimento ATC soma R$ 29.579,07 em glosas, o maior valor entre os procedimentos da base.", "O hospital HOSP SUDESTE registra R$ 32.379,17 em glosas.", "O prazo médio de recebimento é de 30,89 dias, calculado a partir dos 37 registros."];
+document.getElementById('findings').innerHTML=findings.map((t,i)=>`<div class="finding"><span class="num">${i+1}</span><span>${t}</span></div>`).join('');
+</script></body></html>
